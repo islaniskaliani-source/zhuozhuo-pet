@@ -1,0 +1,56 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#cat {
+  position: absolute;
+  bottom: 0;
+  left: 112px;
+  width: 96px;
+  height: 104px;
+  cursor: grab;
+}
+
+#cat:active { cursor: grabbing; }
+
+.bubble {
+  position: absolute;
+  bottom: 110px;             /* 紧贴猫头顶 6px */
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 260px;
+  padding: 8px 12px;
+  background: #fffdf7;
+  border: 2px solid #4a3b2a;
+  border-radius: 14px;
+  font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
+  font-size: 13px;
+  color: #33291c;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  text-align: center;
+}
+
+.bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid #4a3b2a;
+}
+
+.bubble.hidden {
+  opacity: 0;
+  visibility: hidden;
+}

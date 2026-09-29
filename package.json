@@ -1,0 +1,14 @@
+{
+  "name": "zhuozhuo-pet",
+  "version": "1.0.0",
+  "description": "卓卓 — a real-cat desktop pet (Electron). Walks, grooms, rolls, and talks.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "islaniskaliani-source",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}
