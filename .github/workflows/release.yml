@@ -5,9 +5,13 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -32,3 +36,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder --${{ matrix.artifact }} --publish always
+
+      - name: Dump electron-builder log on failure
+        if: failure()
+        shell: bash
+        run: |
+          LOG=$(ls -t "$HOME/AppData/Local/electron-builder/Log"/*.log "$HOME/Library/Logs/electron-builder"/*.log 2>/dev/null | head -1)
+          if [ -z "$LOG" ]; then LOG=$(ls -t /tmp/electron-builder*.log 2>/dev/null | head -1); fi
+          if [ -n "$LOG" ]; then
+            python3 -c "import sys,pathlib; t=pathlib.Path(sys.argv[1]).read_text(errors='replace')[-3000:]; print('::error::'+t.replace(chr(13),'').replace(chr(10),'%0A'))" "$LOG"
+          else
+            echo "::error::no electron-builder log found"
+          fi
