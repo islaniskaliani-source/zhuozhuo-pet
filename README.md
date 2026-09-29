@@ -13,7 +13,20 @@ A desktop pet built from photos of a real cat. It walks, grooms, rolls around, n
 - **随机发言** — 每 25–75 秒冒一次中文猫话气泡，早上/深夜/饭点有不同台词
 - **系统托盘** — 暂停/继续、催它说句话、退出
 
-## 快速开始 / Getting Started
+## 下载即用 / Download & Run (No Node.js needed)
+
+前往 **[Releases](https://github.com/islaniskaliani-source/zhuozhuo-pet/releases)** 页面下载：
+
+| 文件 | 平台 | 使用方式 |
+|---|---|---|
+| `ZhuozhuoPet-1.0.0.dmg` (arm64) | Apple Silicon Mac (M1–M4) | 打开后把图标拖进「应用程序」 |
+| `ZhuozhuoPet-1.0.0-x64.dmg` | Intel Mac | 同上 |
+| `ZhuozhuoPet Setup 1.0.0.exe` | Windows 10/11 | 双击安装，自动运行 |
+
+> **首次打开提示（macOS）**：应用未做付费签名公证，Gatekeeper 可能提示"无法打开"。解决：**右键点击应用 → 打开 → 再点打开**，仅第一次需要。
+> Windows 同理可能弹 SmartScreen：点「更多信息」→「仍要运行」。
+
+## 从源码运行 / Run from Source
 
 ```bash
 npm install
