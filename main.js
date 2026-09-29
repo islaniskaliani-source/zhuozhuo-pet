@@ -4,6 +4,11 @@ const path = require('path');
 const WIN_W = 320;
 const WIN_H = 280;
 
+// The cat is 96x104, anchored bottom-left at (112, WIN_H-104) inside the
+// 320x280 window. To let the CAT reach the physical screen edges, the window
+// itself must be allowed to overhang by the surrounding dead margin.
+const CAT = { left: 112, right: 112 + 96, top: WIN_H - 104, bottom: WIN_H };
+
 let win = null;
 let tray = null;
 let paused = false;
@@ -54,8 +59,12 @@ ipcMain.on('win-get-bounds', (e) => {
 ipcMain.on('win-move', (e, { x, y }) => {
   if (!win) return;
   const wa = workArea();
-  const cx = Math.max(wa.x, Math.min(wa.x + wa.width - WIN_W, Math.round(x)));
-  const cy = Math.max(wa.y, Math.min(wa.y + wa.height - WIN_H, Math.round(y)));
+  const minX = wa.x - CAT.left;
+  const maxX = wa.x + wa.width - CAT.right;
+  const minY = wa.y - CAT.top;
+  const maxY = wa.y + wa.height - CAT.bottom;
+  const cx = Math.max(minX, Math.min(maxX, Math.round(x)));
+  const cy = Math.max(minY, Math.min(maxY, Math.round(y)));
   win.setPosition(cx, cy);
 });
 

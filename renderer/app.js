@@ -2,18 +2,18 @@
 
 const CELL_W = 192, CELL_H = 208, COLS = 8;
 const SCALE = 0.5;               // 96x104，小巧版
+const CAT_LEFT = 112, CAT_RIGHT = 112 + 96;  // cat box inside the 320px window
 const ROWS = {
   idle: 0, walk: 1, jump: 2, attack: 3, defend: 4,
   die: 5, win: 6, lose: 7, custom: 8,
 };
 const FRAME_MS = 125;
-const WALK_SPEED = 35;          // px/s
+const WALK_SPEED = 60;           // px/s
 const GRAVITY = 2200;           // px/s^2
 
 const canvas = document.getElementById('cat');
 const ctx = canvas.getContext('2d');
-const sheet = new Image();
-sheet.src = '../assets/spritesheet.webp';
+const sheets = [];              // two spritesheets -> photo variety per action
 
 const bubble = document.getElementById('bubble');
 const bubbleText = document.getElementById('bubble-text');
@@ -51,9 +51,16 @@ let paused = false;
 let dragging = false, dragMoved = 0, lastPointer = null;
 let bubbleTimer = null, speakTimer = null;
 let hoverActive = false;
+let curSheet = 0;                // which photo set the current action uses
+let homeX = 0;                   // the spot the cat wanders back to after walking
+let walkTargetX = 0, walkPhase = 'out', walkDeadline = 0;
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const floorY = () => workArea.y + workArea.height - winH;
+const bounds = () => ({
+  minX: workArea.x - CAT_LEFT,
+  maxX: workArea.x + workArea.width - CAT_RIGHT,
+});
 
 function speak(kind) {
   const hour = new Date().getHours();
@@ -82,7 +89,7 @@ function scheduleSpeak() {
 
 const STATES = {
   idle: { row: 'idle', min: 150000, max: 210000 },   // 待机 2.5-3.5 分钟才换动作
-  walk: { row: 'walk', min: 2000, max: 6000 },
+  walk: { row: 'walk', min: 1e12, max: 1e12 },        // ends when the cat is home
   jump: { row: 'jump', min: 1600, max: 1600, onEnter: () => speak('jump') },
   groom: { row: 'lose', min: 5000, max: 10000, onEnter: () => speak('groom') },
   sleep: { row: 'die', min: 8000, max: 20000, onEnter: () => speak('sleep') },
@@ -99,8 +106,20 @@ const WEIGHTS = [
 function enterState(name) {
   state = name;
   const s = STATES[name];
+  curSheet = Math.floor(Math.random() * sheets.length);   // a different photo set each time
   stateUntil = performance.now() + s.min + Math.random() * (s.max - s.min);
-  if (name === 'walk') dir = Math.random() < 0.5 ? -1 : (Math.random() < 0.5 ? dir : 1);
+  if (name === 'walk') {
+    // Remember where we started, stroll to a nearby point, then come back.
+    const { minX, maxX } = bounds();
+    homeX = pos.x;
+    const room = 240;
+    let tx = homeX + (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * room);
+    tx = Math.max(minX + 30, Math.min(maxX - 30, tx));
+    if (Math.abs(tx - homeX) < 80) tx = homeX + (tx >= homeX ? 80 : -80);
+    walkTargetX = tx;
+    walkPhase = 'out';
+    walkDeadline = performance.now() + 30000;            // hard safety cap
+  }
   if (s.onEnter) s.onEnter();
 }
 
@@ -117,7 +136,8 @@ function nextWeightedState() {
 
 function draw(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!sheet.complete || !sheet.naturalWidth) return;
+  const sheet = sheets[curSheet];
+  if (!sheet || !sheet.complete || !sheet.naturalWidth) return;
 
   if (now - lastFrameAt >= FRAME_MS) {
     lastFrameAt = now;
@@ -156,15 +176,28 @@ function tick(now) {
       }
       window.petApi.move(pos.x, pos.y);
     } else if (state === 'walk' && !dragging) {
+      const { minX, maxX } = bounds();
+      const dest = walkPhase === 'out' ? walkTargetX : homeX;
+      dir = dest > pos.x ? 1 : -1;
       pos.x += dir * WALK_SPEED * dt;
-      const minX = workArea.x, maxX = workArea.x + workArea.width - winW;
-      if (pos.x <= minX) { pos.x = minX; dir = 1; }
-      if (pos.x >= maxX) { pos.x = maxX; dir = -1; }
+      pos.x = Math.max(minX, Math.min(maxX, pos.x));
       pos.y = floorY();
+      const arrived = Math.abs(pos.x - dest) <= WALK_SPEED * dt + 1;
+      if (arrived) {
+        if (walkPhase === 'out') {
+          walkPhase = 'back';
+        } else {
+          pos.x = homeX;              // snapped back to the original spot
+          enterState('idle');
+        }
+      } else if (now >= walkDeadline) {
+        pos.x = homeX;
+        enterState('idle');
+      }
       window.petApi.move(pos.x, pos.y);
     }
 
-    if (now >= stateUntil && !dragging && !falling) nextWeightedState();
+    if (state !== 'walk' && now >= stateUntil && !dragging && !falling) nextWeightedState();
     draw(now);
   }
   requestAnimationFrame(tick);
@@ -211,7 +244,8 @@ window.addEventListener('mouseup', () => {
     return;
   }
   speak('drag');
-  if (pos.y < floorY()) {                    // dropped mid-air: fall
+  homeX = pos.x;                              // wherever it was dropped is "home" now
+  if (pos.y < floorY()) {                      // dropped mid-air: fall
     falling = true;
     vy = 0;
   } else {
@@ -226,18 +260,23 @@ window.petApi.on('force-speak', () => speak('general'));
 
 /* ---------- boot ---------- */
 
-let boundsReady = false, sheetReady = false;
+let boundsReady = false, sheetsReady = 0;
 
 function tryBoot() {
-  if (!(boundsReady && sheetReady) || winH === 0) return;
+  if (!(boundsReady && sheetsReady === sheets.length) || winH === 0) return;
+  homeX = pos.x;
   speak('startup');
   scheduleSpeak();
   enterState('idle');
   requestAnimationFrame(tick);
 }
 
-sheet.onload = () => { sheetReady = true; tryBoot(); };
-if (sheet.complete) { sheetReady = true; }
+['../assets/spritesheet.webp', '../assets/spritesheet2.webp'].forEach((src) => {
+  const img = new Image();
+  img.onload = () => { sheetsReady++; tryBoot(); };
+  img.src = src;
+  sheets.push(img);
+});
 
 window.petApi.getBounds().then((b) => {
   pos = { x: b.x, y: b.y };
