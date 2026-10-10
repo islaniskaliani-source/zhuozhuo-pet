@@ -12,6 +12,9 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # Both jobs publish into the same GitHub Release, so they must not run at
+      # the same time — the loser of that race fails to upload.
+      max-parallel: 1
       matrix:
         include:
           - os: macos-latest
