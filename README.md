@@ -21,9 +21,9 @@ A desktop pet built from photos of a real cat. It walks, grooms, rolls around, n
 
 | 文件 | 平台 | 使用方式 |
 |---|---|---|
-| `ZhuozhuoPet-1.2.0.dmg` (arm64) | Apple Silicon Mac (M1–M4) | 打开后把图标拖进「应用程序」 |
-| `ZhuozhuoPet-1.2.0-x64.dmg` | Intel Mac | 同上 |
-| `ZhuozhuoPet Setup 1.2.0.exe` | Windows 10/11 | 双击安装，自动运行 |
+| `ZhuozhuoPet-1.2.0-arm64.dmg` | Apple Silicon Mac (M1–M4) | 打开后把图标拖进「应用程序」 |
+| `ZhuozhuoPet-1.2.0.dmg` | Intel Mac | 同上 |
+| `ZhuozhuoPet-Setup-1.2.0.exe` | Windows 10/11 | 双击安装，自动运行 |
 
 > **首次打开提示（macOS）**：应用未做付费签名公证，Gatekeeper 可能提示"无法打开"。解决：**右键点击应用 → 打开 → 再点打开**，仅第一次需要。
 > Windows 同理可能弹 SmartScreen：点「更多信息」→「仍要运行」。
