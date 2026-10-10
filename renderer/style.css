@@ -55,6 +55,14 @@ html, body {
   visibility: hidden;
 }
 
+/* the 🐟 offer: big enough to click, invites the click */
+.bubble.hungry {
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: 26px;
+  padding: 10px 16px;
+}
+
 .heart {
   position: absolute;
   bottom: 108px;

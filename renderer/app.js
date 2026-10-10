@@ -72,7 +72,7 @@ let lastBiteAt = 0, lastStartleAt = 0, lastNeedyAt = 0;
 let purr = 50;                   // 好感度 0..100
 
 let lastPounceAt = 0;
-let food = null;                 // {id, x, y} dropped fish, cat walks to eat
+let hungry = false, hungryTimer = null;   // 🐟 shown in the bubble, waiting to be clicked
 let poopCount = 0, lastWarnAt = 0;
 
 // placement mode: false = gravity/fall (mode 1), true = stay where placed (mode 2)
@@ -169,6 +169,7 @@ function moveToward(tx, ty, speed, dt) {
 const catCenter = () => ({ x: pos.x + CAT_LEFT + 48, y: pos.y + winH - 52 });
 
 function speak(kind) {
+  if (hungry) return;            // too busy begging for the fish to chat
   const hour = new Date().getHours();
   let pool = LINES[kind] || LINES.general;
   if (kind === 'general') {
@@ -189,6 +190,34 @@ function scheduleSpeak() {
     if (!paused && !dragging) speak('general');
     scheduleSpeak();
   }, 240000 + Math.random() * 120000);   // 4-6 分钟，约 5 分钟一次
+}
+
+/* ---------- feeding: the bubble holds up a 🐟, clicking it feeds the cat ---------- */
+
+function showHungry() {
+  hungry = true;
+  clearTimeout(bubbleTimer);
+  clearTimeout(hungryTimer);
+  bubbleText.textContent = '🐟';
+  bubble.classList.remove('hidden');
+  bubble.classList.add('hungry');
+  hungryTimer = setTimeout(clearHungry, 180000);    // gets bored of begging after 3 min
+}
+
+function clearHungry() {
+  hungry = false;
+  clearTimeout(hungryTimer);
+  if (bubble.classList.contains('hungry')) {
+    bubble.classList.remove('hungry');
+    bubble.classList.add('hidden');
+  }
+}
+
+function feed() {
+  if (!hungry) return;
+  clearHungry();
+  enterState('eat');
+  pendingPoopAt = performance.now() + 30000 + Math.random() * 30000;   // eat -> poop (loop)
 }
 
 /* ---------- state machine ---------- */
@@ -335,19 +364,6 @@ function tick(now) {
         enterState('idle');
       }
       window.petApi.move(pos.x, pos.y);
-    } else if (!dragging && food) {
-      // Walk to the dropped fish and eat it.
-      ensureWalk(now);
-      const c = catCenter();
-      const { minX, maxX } = bounds();
-      dir = food.x > c.x ? 1 : -1;
-      pos.x = Math.max(minX, Math.min(maxX, pos.x + dir * WALK_SPEED * dt));
-      if (!freeMode) pos.y = floorY();
-      if (Math.abs(food.x - c.x) < 40) {
-        window.petApi.send('eat-food', { id: food.id });
-        enterState('eat');
-      }
-      window.petApi.move(pos.x, pos.y);
     } else if (!dragging && mode === 'poopWalk') {
       // Stroll to a chosen spot anywhere on screen, then drop one poop.
       if (moveToward(poopTx, poopTy, POOP_SPEED, dt) < 30) {
@@ -400,13 +416,13 @@ function tick(now) {
     }
 
     // Post-meal poop — the feed -> poop -> clean loop.
-    if (pendingPoopAt && now >= pendingPoopAt && !dragging && !falling && !food && mode === 'none') {
+    if (pendingPoopAt && now >= pendingPoopAt && !dragging && !falling && mode === 'none') {
       pendingPoopAt = 0;
       startPoopWalk(now);
     }
 
     // One spontaneous interaction every 30-60 min: a poop or a mouse-hunt.
-    if (nextInteractionAt && now >= nextInteractionAt && !dragging && !falling && !food && mode === 'none') {
+    if (nextInteractionAt && now >= nextInteractionAt && !dragging && !falling && mode === 'none') {
       nextInteractionAt = 0;
       if (Math.random() < 0.5) startPoopWalk(now);
       else startHunt(now);
@@ -414,12 +430,12 @@ function tick(now) {
     }
 
     // Once the interaction's own animation has played out, walk back to where it started.
-    if (retreatQueued && mode === 'none' && now >= stateUntil && !dragging && !falling && !food) {
+    if (retreatQueued && mode === 'none' && now >= stateUntil && !dragging && !falling) {
       retreatQueued = false;
       startRetreat(now);
     }
 
-    if (state !== 'walk' && mode === 'none' && !food && now >= stateUntil && !dragging && !falling) nextWeightedState();
+    if (state !== 'walk' && mode === 'none' && now >= stateUntil && !dragging && !falling) nextWeightedState();
     evaluateReactions(now);
     draw(now);
   }
@@ -435,8 +451,15 @@ function isOnCat(clientX, clientY) {
   return dx * dx + dy * dy <= 1;
 }
 
+// the 🐟 bubble is a click target only while the cat is begging
+function isOnBubble(clientX, clientY) {
+  if (!hungry) return false;
+  const r = bubble.getBoundingClientRect();
+  return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+}
+
 document.addEventListener('mousemove', (e) => {
-  const on = isOnCat(e.clientX, e.clientY);
+  const on = isOnCat(e.clientX, e.clientY) || isOnBubble(e.clientX, e.clientY);
   if (on !== hoverActive) {
     hoverActive = on;
     window.petApi.setCatHover(on);
@@ -456,6 +479,12 @@ canvas.addEventListener('mousedown', (e) => {
   dragMoved = 0;
   lastPointer = { x: e.screenX, y: e.screenY };
   enterState('carried');
+});
+
+// Clicking the 🐟 bubble is the feeding gesture.
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || paused) return;
+  if (isOnBubble(e.clientX, e.clientY)) feed();
 });
 
 window.addEventListener('mouseup', () => {
@@ -497,7 +526,8 @@ window.petApi.on('set-free-mode', (v) => {
 
 window.petApi.on('trigger-hunt', () => {
   const now = performance.now();
-  if (dragging || falling || food || mode !== 'none') return;
+  if (dragging || falling || mode !== 'none') return;
+  clearHungry();
   startHunt(now);
 });
 
@@ -511,12 +541,9 @@ window.petApi.on('cursor', (c) => {
   cursor = { x: c.x, y: c.y, t: now };
 });
 
-window.petApi.on('food-dropped', (f) => { homePos = catCenter(); food = f; });
-
-window.petApi.on('food-eaten', () => {
-  food = null;
-  retreatQueued = true;                                                        // eat, then walk back to where it was
-  pendingPoopAt = performance.now() + 30000 + Math.random() * 30000;   // eat -> poop (loop)
+window.petApi.on('offer-food', () => {
+  if (paused || dragging) return;
+  showHungry();
 });
 
 window.petApi.on('poop-cleaned', () => {
@@ -526,7 +553,7 @@ window.petApi.on('poop-cleaned', () => {
   spawnHeart();
 });
 
-/* ---------- meal-time feeding (auto) ---------- */
+/* ---------- meal-time feeding ---------- */
 // breakfast 09:00-09:30, lunch 11:30-12:30, dinner 17:30-18:30
 const MEALS = [[9, 0, 9, 30], [11, 30, 12, 30], [17, 30, 18, 30]];
 let lastMealKey = '';
@@ -537,10 +564,10 @@ function checkMeal() {
     const [h1, m1, h2, m2] = MEALS[i];
     if (mins >= h1 * 60 + m1 && mins <= h2 * 60 + m2) {
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${i}`;
-      if (lastMealKey !== key && mode === 'none' && !food && !dragging && !falling) {
+      if (lastMealKey !== key && !hungry && !dragging) {
         lastMealKey = key;
         speak('meal');
-        window.petApi.send('meal-feed');     // main drops a fish; the cat trots over and eats it
+        setTimeout(() => { if (!paused) showHungry(); }, 3000);   // says it's meal time, then holds up a 🐟 to click
       }
       return;
     }

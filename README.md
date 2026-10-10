@@ -12,8 +12,8 @@ A desktop pet built from photos of a real cat. It walks, grooms, rolls around, n
 - **互动** — 单击撸猫、拖拽拎猫；两种放置模式：「自然下落」（松手掉到屏幕底部）或「自由放置」（放哪停哪，不掉）
 - **随机发言** — 每 4–6 分钟冒一次中文猫话气泡，早上/深夜/饭点有不同台词
 - **自发互动** — 每 30–60 分钟自己找事做：走到屏幕某处拉一坨屎，或满屏追咬你的鼠标（追上 3 秒后收手）；互动完自己走回原来待的地方
-- **饭点投喂** — 9:00–9:30 / 11:30–12:30 / 17:30–18:30 自动掉一条小鱼干，它会走过去吃掉
-- **系统托盘** — 暂停/继续、催它说句话、投喂小鱼干、逗它追鼠标、切换放置模式、退出
+- **饭点投喂** — 9:00–9:30 / 11:30–12:30 / 17:30–18:30 头顶举起一条 🐟，点气泡就算喂它（托盘「投喂小鱼干」随时可触发）
+- **系统托盘** — 暂停/继续、催它说句话、投喂小鱼干（让它举出 🐟）、逗它追鼠标、切换放置模式、退出
 
 ## 下载即用 / Download & Run (No Node.js needed)
 
@@ -21,9 +21,9 @@ A desktop pet built from photos of a real cat. It walks, grooms, rolls around, n
 
 | 文件 | 平台 | 使用方式 |
 |---|---|---|
-| `ZhuozhuoPet-1.2.1-arm64.dmg` | Apple Silicon Mac (M1–M4) | 打开后把图标拖进「应用程序」 |
-| `ZhuozhuoPet-1.2.1.dmg` | Intel Mac | 同上 |
-| `ZhuozhuoPet-Setup-1.2.1.exe` | Windows 10/11 | 双击安装，自动运行 |
+| `ZhuozhuoPet-1.2.2-arm64.dmg` | Apple Silicon Mac (M1–M4) | 打开后把图标拖进「应用程序」 |
+| `ZhuozhuoPet-1.2.2.dmg` | Intel Mac | 同上 |
+| `ZhuozhuoPet-Setup-1.2.2.exe` | Windows 10/11 | 双击安装，自动运行 |
 
 > **首次打开提示（macOS）**：应用未做付费签名公证，Gatekeeper 可能提示"无法打开"。解决：**右键点击应用 → 打开 → 再点打开**，仅第一次需要。
 > Windows 同理可能弹 SmartScreen：点「更多信息」→「仍要运行」。

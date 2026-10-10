@@ -92,10 +92,10 @@ function startCursorStream() {
   }, 80);
 }
 
-/* ---------- fullscreen props layer: poop / food ---------- */
+/* ---------- fullscreen props layer: poop ---------- */
 
 let propsWin = null;
-const world = { poops: [], food: null, nextId: 1 };
+const world = { poops: [], nextId: 1 };
 
 function screenBounds() {
   return screen.getPrimaryDisplay().bounds;   // full screen, incl. menu bar
@@ -124,7 +124,7 @@ function ensurePropsWin() {
 }
 
 function pushProps() {
-  sendToProps('props', { poops: world.poops, food: world.food });
+  sendToProps('props', { poops: world.poops });
 }
 
 ipcMain.on('props-ready', () => {
@@ -143,8 +143,6 @@ ipcMain.on('prop-click', (e, { type, id }) => {
     world.poops = world.poops.filter((p) => p.id !== id);
     pushProps();
     sendToRenderer('poop-cleaned', { id });
-  } else if (type === 'food') {
-    if (world.food && world.food.id === id) { world.food = null; pushProps(); }
   }
 });
 
@@ -153,28 +151,6 @@ ipcMain.on('props-hover', (e, hover) => {
     propsWin.setIgnoreMouseEvents(!hover, { forward: true });
   }
 });
-
-function dropFood() {
-  if (!win) return;
-  ensurePropsWin();
-  const b = screenBounds();
-  const x = Math.round(b.x + 80 + Math.random() * (b.width - 160));
-  const [ , wy] = win.getPosition();          // drop the fish at the cat's foot line,
-  const y = Math.round(wy + WIN_H - 6);        // not the screen bottom (would hide behind the Dock)
-  world.food = { id: world.nextId++, x, y };
-  pushProps();
-  sendToRenderer('food-dropped', world.food);
-}
-
-ipcMain.on('eat-food', (e, { id }) => {
-  if (world.food && world.food.id === id) {
-    world.food = null;
-    pushProps();
-    sendToRenderer('food-eaten', { id });
-  }
-});
-
-ipcMain.on('meal-feed', () => dropFood());   // auto-feeding at a meal window
 
 ipcMain.on('sync-free-mode', (e, v) => {      // the pet auto-switched mode -> update the checkbox
   freeMode = !!v;
@@ -197,7 +173,7 @@ function buildTray() {
       },
     },
     { label: '催它说句话', click: () => sendToRenderer('force-speak') },
-    { label: '投喂小鱼干', click: () => dropFood() },
+    { label: '投喂小鱼干', click: () => sendToRenderer('offer-food') },
     { label: '逗它追鼠标', click: () => sendToRenderer('trigger-hunt') },
     { type: 'separator' },
     {

@@ -1,29 +1,22 @@
-/* Props overlay: renders poop / food in screen space. */
+/* Props overlay: renders poop in screen space. */
 
 const box = document.getElementById('props');
-let current = { poops: [], food: null };
 
-window.petApi.on('props', (data) => {
-  current = data || { poops: [], food: null };
-  render();
-});
-
-function makeProp(type, o, emoji) {
+function makePoop(o) {
   const el = document.createElement('div');
-  el.className = 'prop ' + type;
-  el.textContent = emoji;
+  el.className = 'prop poop';
+  el.textContent = '💩';
   el.style.left = o.x + 'px';
   el.style.top = o.y + 'px';
-  el.dataset.type = type;
+  el.dataset.type = 'poop';
   el.dataset.id = o.id;
   return el;
 }
 
-function render() {
+window.petApi.on('props', (data) => {
   box.innerHTML = '';
-  for (const p of current.poops) box.appendChild(makeProp('poop', p, '💩'));
-  if (current.food) box.appendChild(makeProp('food', current.food, '🐟'));
-}
+  for (const p of (data && data.poops) || []) box.appendChild(makePoop(p));
+});
 
 // Hovering a prop turns this window interactive so the click lands on it.
 document.addEventListener('mousemove', (e) => {
