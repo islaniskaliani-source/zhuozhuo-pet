@@ -37,6 +37,9 @@ function createWindow() {
     hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
+    // Without this macOS clamps the window below the menu bar, so the cat's
+    // 176px of dead margin can never overhang the top edge.
+    enableLargerThanScreen: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -387,7 +387,12 @@ function tick(now) {
           huntEndAt = now + 3000;        // catch it, then 3 seconds and done
         }
       }
-      if (now >= huntEndAt) { mode = 'none'; enterState('idle'); retreatQueued = true; }
+      if (now >= huntEndAt) {
+        mode = 'none';
+        enterState('idle');
+        stateUntil = now + 800;          // idle's default 2.5-3.5 min would stall the walk home
+        retreatQueued = true;
+      }
       window.petApi.move(pos.x, pos.y);
     } else if (!dragging && mode === 'retreat') {
       // Walk back to the spot the cat stood in before the interaction.
