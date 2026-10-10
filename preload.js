@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('petApi', {
   }),
   move: (x, y) => ipcRenderer.send('win-move', { x, y }),
   setCatHover: (hover) => ipcRenderer.send('set-cat-hover', hover),
+  send: (channel, payload) => ipcRenderer.send(channel, payload),
   on: (channel, fn) => ipcRenderer.on(channel, (e, payload) => fn(payload)),
 });

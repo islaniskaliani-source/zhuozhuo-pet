@@ -54,3 +54,17 @@ html, body {
   opacity: 0;
   visibility: hidden;
 }
+
+.heart {
+  position: absolute;
+  bottom: 108px;
+  font-size: 16px;
+  pointer-events: none;
+  animation: floatUp 1.2s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-46px) scale(1.1); }
+}

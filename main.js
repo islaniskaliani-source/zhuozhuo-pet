@@ -11,7 +11,9 @@ const CAT = { left: 112, right: 112 + 96, top: WIN_H - 104, bottom: WIN_H };
 
 let win = null;
 let tray = null;
+let trayMenu = null;
 let paused = false;
+let freeMode = false;            // false = gravity/fall, true = cat stays where placed
 
 function workArea() {
   return screen.getPrimaryDisplay().workArea;
@@ -65,6 +67,7 @@ ipcMain.on('win-move', (e, { x, y }) => {
   const maxY = wa.y + wa.height - CAT.bottom;
   const cx = Math.max(minX, Math.min(maxX, Math.round(x)));
   const cy = Math.max(minY, Math.min(maxY, Math.round(y)));
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;   // a bad frame must not crash the app
   win.setPosition(cx, cy);
 });
 
@@ -78,11 +81,114 @@ function sendToRenderer(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+// Stream the OS cursor's screen position to the renderer so the cat can react
+// (startle / bite / chase). ~12fps is plenty for these gestures.
+let cursorTimer = null;
+function startCursorStream() {
+  cursorTimer = setInterval(() => {
+    if (!win || win.isDestroyed() || paused) return;
+    const p = screen.getCursorScreenPoint();
+    win.webContents.send('cursor', { x: p.x, y: p.y });
+  }, 80);
+}
+
+/* ---------- fullscreen props layer: poop / food ---------- */
+
+let propsWin = null;
+const world = { poops: [], food: null, nextId: 1 };
+
+function screenBounds() {
+  return screen.getPrimaryDisplay().bounds;   // full screen, incl. menu bar
+}
+
+function sendToProps(channel, payload) {
+  if (propsWin && !propsWin.isDestroyed()) propsWin.webContents.send(channel, payload);
+}
+
+function ensurePropsWin() {
+  if (propsWin && !propsWin.isDestroyed()) return propsWin;
+  const b = screenBounds();
+  propsWin = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    transparent: true, frame: false, resizable: false, hasShadow: false,
+    alwaysOnTop: true, skipTaskbar: true, enableLargerThanScreen: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false,
+    },
+  });
+  propsWin.setAlwaysOnTop(true, 'screen-saver');
+  propsWin.setIgnoreMouseEvents(true, { forward: true });
+  propsWin.loadFile(path.join(__dirname, 'renderer', 'props.html'));
+  return propsWin;
+}
+
+function pushProps() {
+  sendToProps('props', { poops: world.poops, food: world.food });
+}
+
+ipcMain.on('props-ready', () => {
+  pushProps();                                   // catch up on anything queued
+});
+
+ipcMain.on('spawn-poop', (e, { x, y }) => {
+  ensurePropsWin();
+  if (world.poops.length >= 5) return;         // cap the pile
+  world.poops.push({ id: world.nextId++, x: Math.round(x), y: Math.round(y) });
+  pushProps();
+});
+
+ipcMain.on('prop-click', (e, { type, id }) => {
+  if (type === 'poop') {
+    world.poops = world.poops.filter((p) => p.id !== id);
+    pushProps();
+    sendToRenderer('poop-cleaned', { id });
+  } else if (type === 'food') {
+    if (world.food && world.food.id === id) { world.food = null; pushProps(); }
+  }
+});
+
+ipcMain.on('props-hover', (e, hover) => {
+  if (propsWin && !propsWin.isDestroyed()) {
+    propsWin.setIgnoreMouseEvents(!hover, { forward: true });
+  }
+});
+
+function dropFood() {
+  if (!win) return;
+  ensurePropsWin();
+  const b = screenBounds();
+  const x = Math.round(b.x + 80 + Math.random() * (b.width - 160));
+  const [ , wy] = win.getPosition();          // drop the fish at the cat's foot line,
+  const y = Math.round(wy + WIN_H - 6);        // not the screen bottom (would hide behind the Dock)
+  world.food = { id: world.nextId++, x, y };
+  pushProps();
+  sendToRenderer('food-dropped', world.food);
+}
+
+ipcMain.on('eat-food', (e, { id }) => {
+  if (world.food && world.food.id === id) {
+    world.food = null;
+    pushProps();
+    sendToRenderer('food-eaten', { id });
+  }
+});
+
+ipcMain.on('meal-feed', () => dropFood());   // auto-feeding at a meal window
+
+ipcMain.on('sync-free-mode', (e, v) => {      // the pet auto-switched mode -> update the checkbox
+  freeMode = !!v;
+  if (trayMenu) {
+    const it = trayMenu.getMenuItemById('freemode');
+    if (it) it.checked = freeMode;
+  }
+});
+
 function buildTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png'));
   tray = new Tray(icon.resize({ width: 18, height: 18 }));
   tray.setToolTip('卓卓桌宠');
-  tray.setContextMenu(Menu.buildFromTemplate([
+  trayMenu = Menu.buildFromTemplate([
     {
       label: '暂停/继续',
       click: () => {
@@ -91,9 +197,20 @@ function buildTray() {
       },
     },
     { label: '催它说句话', click: () => sendToRenderer('force-speak') },
+    { label: '投喂小鱼干', click: () => dropFood() },
+    { label: '逗它追鼠标', click: () => sendToRenderer('trigger-hunt') },
+    { type: 'separator' },
+    {
+      id: 'freemode',
+      label: '自由放置（放哪停哪，不掉）',
+      type: 'checkbox',
+      checked: freeMode,
+      click: (it) => { freeMode = it.checked; sendToRenderer('set-free-mode', freeMode); },
+    },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() },
-  ]));
+  ]);
+  tray.setContextMenu(trayMenu);
 }
 
 const singleton = app.requestSingleInstanceLock();
@@ -110,6 +227,7 @@ app.whenReady().then(() => {
   if (!singleton) return;
   createWindow();
   buildTray();
+  startCursorStream();
 });
 
 app.on('window-all-closed', () => app.quit());
