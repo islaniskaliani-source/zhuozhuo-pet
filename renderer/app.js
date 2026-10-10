@@ -84,8 +84,9 @@ let pendingPoopAt = 0;           // post-meal poop (feed -> poop -> clean loop)
 let mode = 'none';               // 'none' | 'poopWalk' | 'hunt' | 'retreat'
 let poopTx = 0, poopTy = 0;      // spot the cat strolls to before pooping
 let huntEndAt = 0;               // the hunt ends once now >= this
-let retreatQueued = false;       // interaction over -> trot off to a screen corner
+let retreatQueued = false;       // interaction over -> walk back to where it started
 let retreatTx = 0, retreatTy = 0;
+let homePos = null;              // cat-centre point to return to, captured when an interaction starts
 
 function scheduleInteraction(now) {
   nextInteractionAt = now + T_MIN + Math.random() * (T_MAX - T_MIN);
@@ -99,15 +100,17 @@ function ensureWalk(now) {
 }
 function startPoopWalk(now) {
   setFree(true);                 // pooping roams the whole screen -> mode 2
-  const b = bounds(), by = boundsY();
-  poopTx = b.minX + 80 + Math.random() * (b.maxX - b.minX - 160);
-  poopTy = by.minY + 60 + Math.random() * (by.maxY - by.minY - 120);
+  homePos = catCenter();
+  const r = roamBox();
+  poopTx = r.x1 + Math.random() * (r.x2 - r.x1);
+  poopTy = r.y1 + Math.random() * (r.y2 - r.y1);
   falling = false;
   mode = 'poopWalk';
   ensureWalk(now);
 }
 function startHunt(now) {
   setFree(true);                 // chasing the mouse roams the whole screen -> mode 2
+  homePos = catCenter();
   falling = false;
   mode = 'hunt';
   huntEndAt = now + 20000;       // hard cap in case it never catches the cursor
@@ -115,12 +118,11 @@ function startHunt(now) {
   ensureWalk(now);
 }
 function startRetreat(now) {
-  // Park in a screen corner once an interaction is over. In gravity mode the cat
-  // can only reach the two bottom corners.
-  const wa = workArea;
-  const ys = freeMode ? [wa.y + 90, wa.y + wa.height - 40] : [wa.y + wa.height - 40];
-  retreatTx = wa.x + (Math.random() < 0.5 ? 90 : wa.width - 90);
-  retreatTy = ys[Math.floor(Math.random() * ys.length)];
+  // Go back to the spot the cat stood in before the interaction.
+  const h = homePos || catCenter();
+  const r = roamBox();
+  retreatTx = Math.max(r.x1, Math.min(r.x2, h.x));
+  retreatTy = Math.max(r.y1, Math.min(r.y2, h.y));
   mode = 'retreat';
   ensureWalk(now);
 }
@@ -140,6 +142,12 @@ const bounds = () => ({
 const boundsY = () => ({
   minY: workArea.y - (winH - 104),
   maxY: workArea.y + workArea.height - winH,
+});
+// where the cat's body centre may go: the full work area, no slack, so the cat
+// sits flush against the menu bar and the bottom edge
+const roamBox = () => ({
+  x1: workArea.x + 48, x2: workArea.x + workArea.width - 48,
+  y1: workArea.y + 52, y2: workArea.y + workArea.height - 52,
 });
 // steer the window so the cat's body centre eases toward a screen point; returns distance left
 function moveToward(tx, ty, speed, dt) {
@@ -366,7 +374,7 @@ function tick(now) {
       if (now >= huntEndAt) { mode = 'none'; enterState('idle'); retreatQueued = true; }
       window.petApi.move(pos.x, pos.y);
     } else if (!dragging && mode === 'retreat') {
-      // Walk to a screen corner and stay there.
+      // Walk back to the spot the cat stood in before the interaction.
       if (moveToward(retreatTx, retreatTy, WALK_SPEED * 1.4, dt) < 30) {
         mode = 'none';
         enterState('idle');
@@ -405,7 +413,7 @@ function tick(now) {
       scheduleInteraction(now);
     }
 
-    // Once the interaction's own animation has played out, go park in a corner.
+    // Once the interaction's own animation has played out, walk back to where it started.
     if (retreatQueued && mode === 'none' && now >= stateUntil && !dragging && !falling && !food) {
       retreatQueued = false;
       startRetreat(now);
@@ -464,7 +472,7 @@ window.addEventListener('mouseup', () => {
   }
   speak('drag');
   homeX = pos.x;                              // wherever it was dropped is "home" now
-  mode = 'none'; retreatQueued = false;        // a manual placement beats the corner
+  mode = 'none'; retreatQueued = false;        // a manual placement beats the auto-return
   if (!freeMode && pos.y < floorY()) {         // gravity mode + dropped mid-air: fall
     falling = true;
     vy = 0;
@@ -503,11 +511,11 @@ window.petApi.on('cursor', (c) => {
   cursor = { x: c.x, y: c.y, t: now };
 });
 
-window.petApi.on('food-dropped', (f) => { food = f; });
+window.petApi.on('food-dropped', (f) => { homePos = catCenter(); food = f; });
 
 window.petApi.on('food-eaten', () => {
   food = null;
-  retreatQueued = true;                                                        // eat, then go back to the corner
+  retreatQueued = true;                                                        // eat, then walk back to where it was
   pendingPoopAt = performance.now() + 30000 + Math.random() * 30000;   // eat -> poop (loop)
 });
 

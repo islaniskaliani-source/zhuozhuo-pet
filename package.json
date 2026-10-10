@@ -1,6 +1,6 @@
 {
   "name": "zhuozhuo-pet",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "卓卓 — a real-cat desktop pet (Electron). Walks, grooms, rolls, and talks.",
   "main": "main.js",
   "scripts": {
